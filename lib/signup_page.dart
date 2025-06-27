@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -11,6 +13,7 @@ class SignupPage extends StatefulWidget {
 class _SignupPageState extends State<SignupPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -20,18 +23,50 @@ class _SignupPageState extends State<SignupPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _handleSignup() {
+  Future<void> _handleSignup() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Implement signup logic (e.g., API call)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signing up...')),
-      );
+      try {
+        final url = Uri.parse('http://127.0.0.1:8000/api/user/');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'name': _nameController.text,
+            'phone': _phoneController.text,
+            'email': _emailController.text,
+            'password': _passwordController.text,
+          }),
+        );
+
+        if (response.statusCode == 201) {
+          final data = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['message'] ?? 'Signup successful! Please log in.')),
+          );
+          _nameController.clear();
+          _phoneController.clear();
+          _emailController.clear();
+          _passwordController.clear();
+          _confirmPasswordController.clear();
+          Navigator.pushReplacementNamed(context, '/login');
+        } else {
+          final errorData = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Signup failed: ${errorData['detail'] ?? errorData.toString()}')),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error. Check your connection or server.')),
+        );
+      }
     }
   }
 
@@ -75,6 +110,24 @@ class _SignupPageState extends State<SignupPage> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your full name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your phone number';
+                    }
+                    if (!RegExp(r'^\+?1?\d{9,15}$').hasMatch(value)) {
+                      return 'Please enter a valid phone number (e.g., +1234567890)';
                     }
                     return null;
                   },
